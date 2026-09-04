@@ -1,0 +1,24 @@
+[project]
+name = "portfolio-rag"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "AKabhishek9", email = "abhishek101242144@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "ipykernel>=7.3.0",
+    "langchain>=1.4.0",
+    "langchain-community>=0.4.2",
+    "langchain-core>=1.6.1",
+    "pymupdf>=1.28.2",
+    "pypdf>=6.17.0",
+]
+
+[project.scripts]
+portfolio-rag = "portfolio_rag:main"
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13.0"]
+build-backend = "uv_build"
