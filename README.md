@@ -144,7 +144,7 @@ pip install -r requirements.txt
 
 ## 🔑 Environment Configuration
 
-A `.env.example` file is provided in the repository. Create your local `.env` file to configure optional API keys for Hugging Face (higher download limits) and your preferred LLM provider:
+Create your local `.env` file to configure optional API keys for Hugging Face (higher download limits) and your preferred LLM provider:
 
 ```bash
 # Copy the example file to .env
@@ -154,19 +154,8 @@ cp .env.example .env
 Edit `.env` with your preferred credentials:
 
 ```env
-# Hugging Face token (prevents unauthenticated rate limit warnings for embeddings)
-HF_TOKEN=your_huggingface_token_here
+#API_KEY=your_groq_api_key_here
 
-# LLM Providers (add key for whichever generator you want to integrate)
-GROQ_API_KEY=your_groq_api_key_here
-OPENAI_API_KEY=your_openai_api_key_here
-GOOGLE_API_KEY=your_google_api_key_here
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
-
-# ChromaDB & Embedding settings
-EMBEDDING_MODEL_NAME=all-MiniLM-L6-v2
-CHROMA_PERSIST_DIRECTORY=knowledge/vector_store
-CHROMA_COLLECTION_NAME=portfolio_knowledge
 ```
 
 > **Note:** `.env` is listed in `.gitignore` to prevent confidential keys from being pushed to GitHub.
