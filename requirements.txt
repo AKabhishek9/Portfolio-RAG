@@ -1,9 +1,15 @@
 langchain
 langchain-core
 langchain-community
+langchain-google-genai
 pypdf
 pymupdf
-
 sentence-transformers
 faiss-cpu
 chromadb
+fastapi
+uvicorn
+python-dotenv
+beautifulsoup4
+lxml
+tqdm
