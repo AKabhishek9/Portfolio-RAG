@@ -2,8 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from portfolio_rag.rag import rag_simple
-
 
 app = FastAPI(
     title="Portfolio RAG",
@@ -58,6 +56,7 @@ def chat(request: ChatRequest):
             "answer": "Please enter a question."
         }
 
+    from portfolio_rag.rag import rag_simple
     answer = rag_simple(question)
 
     return {
