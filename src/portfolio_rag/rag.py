@@ -12,6 +12,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
+API_MODEL = os.getenv("API_MODEL", "gemini-3.6-flash")
 
 if not API_KEY:
     raise ValueError("API_KEY is not set in environment variables.")
@@ -331,9 +332,10 @@ def initialize_rag():
 
     # Gemini LLM
     llm = ChatGoogleGenerativeAI(
-        model="gemini-3.6-flash",
-        google_api_key=API_KEY,
-        temperature=0.2,
+    model=API_MODEL,
+    google_api_key=API_KEY,
+    temperature=0.2,
+    max_output_tokens=300,
     )
 
     print("RAG initialized successfully.")
@@ -343,23 +345,29 @@ def initialize_rag():
 
 def rag_simple(
     question: str,
-    top_k=5,
+    top_k=3,
 ):
-    """
-    Simple RAG pipeline:
 
-    Question
-        ↓
-    Gemini Embedding
-        ↓
-    ChromaDB Retrieval
-        ↓
-    Context
-        ↓
-    Gemini LLM
-        ↓
-    Answer
-    """
+    question = question.strip()
+
+    greetings = {
+        "hi",
+        "hello",
+        "hey",
+        "hii",
+        "hiii",
+        "good morning",
+        "good afternoon",
+        "good evening",
+    }
+
+    if question.lower() in greetings:
+        return (
+            "Hi! I'm Abhishek's portfolio assistant. "
+            "Feel free to ask about his projects, skills, education, "
+            "or experience."
+        )
+
 
     initialize_rag()
 
