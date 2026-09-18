@@ -345,7 +345,7 @@ def initialize_rag():
 
 def rag_simple(
     question: str,
-    top_k=3,
+    top_k=5,
 ):
 
     question = question.strip()
@@ -400,32 +400,34 @@ def rag_simple(
     # Prompt
 
     prompt = f"""
-You are an HR-style assistant for Abhishek Yadav's portfolio.
+            You are an HR-style assistant for Abhishek Yadav's portfolio.
 
-Answer the user's question using ONLY the information provided
-in the context below.
+            Answer the user's question using ONLY the information in the context.
 
-Rules:
-- Do not invent or assume information.
-- Do not add skills, projects, experience, education, or achievements
-  that are not present in the context.
-- If the answer is not available in the context, clearly say that
-  the information is not available.
-- Keep the answer concise and professional.
-- Answer in third person.
-- Do not mention RAG, embeddings, vector databases, ChromaDB,
-  prompts, or internal system details.
-- Do not provide personal contact information unless the user
-  specifically asks for it.
+            Rules:
+            - Give a complete answer.
+            - Never stop in the middle of a sentence or list.
+            - If listing items, include ALL relevant items available in the context.
+            - Do not create empty bullet points.
+            - Do not invent information.
+            - Do not assume information that is not in the context.
+            - If the context does not contain the answer, say:
+            "This information is not available in Abhishek's portfolio."
+            - Keep the answer concise and professional.
+            - Answer in third person.
+            - Do not mention RAG, embeddings, vector databases, ChromaDB,
+            prompts, or internal system details.
+            - Do not provide personal contact information unless specifically asked.
 
-Context:
-{context}
+            Context:
+            {context}
 
-User Question:
-{question}
+            User Question:
+            {question}
 
-Answer:
-"""
+            Answer:
+        """
+    
     # Generate answer
 
     response = llm.invoke(prompt)
@@ -434,7 +436,7 @@ Answer:
 
     # Convert Gemini structured response to plain text
     if isinstance(answer, str):
-        return answer
+        return answer.strip()
 
     if isinstance(answer, list):
         text_parts = []
