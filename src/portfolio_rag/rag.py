@@ -7,6 +7,7 @@ import chromadb
 
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
+
 from langchain_community.document_loaders import (
     TextLoader,
     PyPDFLoader,
@@ -15,13 +16,13 @@ from langchain_community.document_loaders import (
     UnstructuredPowerPointLoader,
     UnstructuredExcelLoader,
 )
+
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 
-# ============================================================
+
 # Environment
-# ============================================================
 
 load_dotenv()
 
@@ -31,9 +32,9 @@ if not API_KEY:
     raise ValueError("API_KEY not found in .env")
 
 
-# ============================================================
-# File Ingestion
-# ============================================================
+
+# -----------------------------File Ingestion
+
 
 def load_file(file_path):
     """
@@ -44,34 +45,43 @@ def load_file(file_path):
     extension = path.suffix.lower()
 
     if extension in [".md", ".txt"]:
+
         loader = TextLoader(
             str(path),
             encoding="utf-8"
         )
 
     elif extension == ".pdf":
+
         loader = PyPDFLoader(str(path))
 
     elif extension == ".docx":
+
         loader = Docx2txtLoader(str(path))
 
     elif extension == ".csv":
+
         loader = CSVLoader(str(path))
 
     elif extension == ".pptx":
+
         loader = UnstructuredPowerPointLoader(str(path))
 
     elif extension in [".xlsx", ".xls"]:
+
         loader = UnstructuredExcelLoader(str(path))
 
     else:
+
         print(f"Skipping unsupported file: {path}")
         return []
 
     try:
+
         return loader.load()
 
     except Exception as e:
+
         print(f"Failed to load {path}: {e}")
         return []
 
@@ -93,7 +103,7 @@ def load_knowledge_base(directory="../knowledge"):
         ".csv",
         ".pptx",
         ".xlsx",
-        ".xls",
+        ".xls"
     }
 
     for file_path in knowledge_path.rglob("*"):
@@ -113,9 +123,9 @@ def load_knowledge_base(directory="../knowledge"):
     return documents
 
 
-# ============================================================
-# Embedding Manager
-# ============================================================
+
+# -----------------------------Embedding Manager
+
 
 class EmbeddingManager:
     """
@@ -127,6 +137,7 @@ class EmbeddingManager:
         self,
         model_name: str = "all-MiniLM-L6-v2"
     ):
+
         self.model_name = model_name
         self.model = None
 
@@ -155,6 +166,7 @@ class EmbeddingManager:
     ) -> np.ndarray:
 
         if not self.model:
+
             raise ValueError(
                 "Model not loaded"
             )
@@ -177,9 +189,8 @@ class EmbeddingManager:
         return embeddings
 
 
-# ============================================================
-# Vector Store
-# ============================================================
+
+# -----------------------------Vector Store
 
 class VectorStore:
     """
@@ -264,9 +275,7 @@ class VectorStore:
 
             doc_id = (
                 f"{source}_{i}"
-                .replace("\\", "_")
-                .replace("/", "_")
-            )
+            ).replace("\\", "_").replace("/", "_")
 
             ids.append(doc_id)
 
@@ -275,6 +284,7 @@ class VectorStore:
             )
 
             metadata["doc_index"] = i
+
             metadata["content_length"] = (
                 len(doc.page_content)
             )
@@ -307,9 +317,9 @@ class VectorStore:
         )
 
 
-# ============================================================
-# RAG Retriever
-# ============================================================
+
+# -----------------------------RAG Retriever
+
 
 class RAGRetriever:
     """
@@ -344,9 +354,7 @@ class RAGRetriever:
         )
 
         results = (
-            self.vector_store
-            .collection
-            .query(
+            self.vector_store.collection.query(
                 query_embeddings=[
                     query_embedding.tolist()
                 ],
@@ -406,9 +414,9 @@ class RAGRetriever:
         return retrieved_docs
 
 
-# ============================================================
-# Initialize RAG Components
-# ============================================================
+
+# -----------------------RAG Configuration
+
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
@@ -421,45 +429,77 @@ VECTOR_STORE_DIR = (
 )
 
 
-embedding_manager = EmbeddingManager()
+# --------------------------RAG Components
 
-vectorstore = VectorStore(
-    persist_directory=str(
-        VECTOR_STORE_DIR
+embedding_manager = None
+vectorstore = None
+rag_retriever = None
+llm = None
+
+
+def initialize_rag():
+
+    global embedding_manager
+    global vectorstore
+    global rag_retriever
+    global llm
+
+    # Prevent duplicate initialization
+    if embedding_manager is not None:
+        return
+
+    print(
+        "Loading RAG components...",
+        flush=True
     )
-)
 
-rag_retriever = RAGRetriever(
-    vectorstore,
-    embedding_manager
-)
+    # Load embedding model
+    embedding_manager = EmbeddingManager()
+
+    # Initialize ChromaDB
+    vectorstore = VectorStore(
+        persist_directory=str(
+            VECTOR_STORE_DIR
+        )
+    )
+
+    # Create retriever
+    rag_retriever = RAGRetriever(
+        vectorstore,
+        embedding_manager
+    )
+
+    # Initialize Gemini
+    llm = ChatGoogleGenerativeAI(
+        api_key=API_KEY,
+        model="gemini-3.6-flash",
+        max_tokens=1024
+    )
+
+    print(
+        "RAG components loaded successfully.",
+        flush=True
+    )
 
 
-# ============================================================
-# Gemini
-# ============================================================
 
-llm = ChatGoogleGenerativeAI(
-    api_key=API_KEY,
-    model="gemini-3.6-flash",
-    max_tokens=1024
-)
-
-
-# ============================================================
-# RAG Function
-# ============================================================
+# -----------------RAG Function
 
 def rag_simple(
     query: str,
     top_k: int = 5
 ):
 
+    # Initialize RAG only when needed
+    initialize_rag()
+
+    # Retrieve relevant documents
     results = rag_retriever.retrieve(
         query,
         top_k=top_k
     )
 
+    # Build context
     context = (
         "\n\n".join(
             [
@@ -471,6 +511,7 @@ def rag_simple(
         else "No relevant documents found."
     )
 
+    # Prompt
     prompt = f"""
 Context:
 {context}
@@ -481,11 +522,21 @@ Question:
 Answer:
 """
 
-    response = llm.invoke(prompt)
+    # Gemini response
+    response = llm.invoke(
+        prompt
+    )
 
-    if isinstance(response.content, str):
+    # Normalize response
+    if isinstance(
+        response.content,
+        str
+    ):
+
         answer = response.content
+
     else:
+
         answer = "\n".join(
             block["text"]
             for block in response.content
