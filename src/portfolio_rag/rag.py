@@ -1,435 +1,291 @@
-from pathlib import Path
-from typing import List, Dict, Any
-
 import os
-import numpy as np
+from pathlib import Path
+
 import chromadb
-
+import numpy as np
 from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
-
-from langchain_community.document_loaders import (
-    TextLoader,
-    PyPDFLoader,
-    Docx2txtLoader,
-    CSVLoader,
-    UnstructuredPowerPointLoader,
-    UnstructuredExcelLoader,
-)
-
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 
-
-# Environment
+# ENVIRONMENT
 
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
 
 if not API_KEY:
-    raise ValueError("API_KEY not found in .env")
+    raise ValueError("API_KEY is not set in environment variables.")
 
 
-
-# -----------------------------File Ingestion
-
-
-def load_file(file_path):
-    """
-    Load a file using the appropriate loader based on its extension.
-    """
-
-    path = Path(file_path)
-    extension = path.suffix.lower()
-
-    if extension in [".md", ".txt"]:
-
-        loader = TextLoader(
-            str(path),
-            encoding="utf-8"
-        )
-
-    elif extension == ".pdf":
-
-        loader = PyPDFLoader(str(path))
-
-    elif extension == ".docx":
-
-        loader = Docx2txtLoader(str(path))
-
-    elif extension == ".csv":
-
-        loader = CSVLoader(str(path))
-
-    elif extension == ".pptx":
-
-        loader = UnstructuredPowerPointLoader(str(path))
-
-    elif extension in [".xlsx", ".xls"]:
-
-        loader = UnstructuredExcelLoader(str(path))
-
-    else:
-
-        print(f"Skipping unsupported file: {path}")
-        return []
-
-    try:
-
-        return loader.load()
-
-    except Exception as e:
-
-        print(f"Failed to load {path}: {e}")
-        return []
-
-
-def load_knowledge_base(directory="../knowledge"):
-    """
-    Load all supported files recursively from the knowledge directory.
-    """
-
-    documents = []
-
-    knowledge_path = Path(directory)
-
-    supported_extensions = {
-        ".md",
-        ".txt",
-        ".pdf",
-        ".docx",
-        ".csv",
-        ".pptx",
-        ".xlsx",
-        ".xls"
-    }
-
-    for file_path in knowledge_path.rglob("*"):
-
-        if not file_path.is_file():
-            continue
-
-        if file_path.suffix.lower() not in supported_extensions:
-            continue
-
-        print(f"Loading: {file_path}")
-
-        file_documents = load_file(file_path)
-
-        documents.extend(file_documents)
-
-    return documents
-
-
-
-# -----------------------------Embedding Manager
-
+# EMBEDDING MANAGER
 
 class EmbeddingManager:
     """
-    Handles document embedding generation
-    using Sentence Transformer.
+    Generates embeddings using Google's Gemini Embedding 2 model.
     """
 
     def __init__(
         self,
-        model_name: str = "all-MiniLM-L6-v2"
+        model_name="gemini-embedding-2",
+        output_dimensionality=768,
+        batch_size=20,
     ):
+        from google import genai
+        from google.genai import types
 
         self.model_name = model_name
-        self.model = None
+        self.output_dimensionality = output_dimensionality
+        self.batch_size = batch_size
 
-        self._load_model()
+        self.genai = genai
+        self.types = types
 
-    def _load_model(self):
+        self.client = genai.Client(api_key=API_KEY)
 
-        print(
-            f"Loading embedding model: "
-            f"{self.model_name}"
-        )
+    def generate_embeddings(self, texts, is_query=False):
+        """
+        Generate embeddings for a list of texts.
 
-        self.model = SentenceTransformer(
-            self.model_name
-        )
+        is_query=False -> document embeddings
+        is_query=True  -> query embedding
+        """
 
-        print(
-            "Embedding model loaded successfully. "
-            f"Dimensions: "
-            f"{self.model.get_embedding_dimension()}"
-        )
-
-    def generate_embeddings(
-        self,
-        texts: List[str]
-    ) -> np.ndarray:
-
-        if not self.model:
-
-            raise ValueError(
-                "Model not loaded"
+        if not texts:
+            return np.empty(
+                (0, self.output_dimensionality),
+                dtype=np.float32,
             )
 
-        print(
-            f"Generating embeddings for "
-            f"{len(texts)} texts..."
+        if is_query:
+            prefix = (
+                "Find portfolio information relevant to this question:\n"
+            )
+        else:
+            prefix = (
+                "Retrieve relevant portfolio information from this document:\n"
+            )
+
+        all_embeddings = []
+
+        # Process texts in batches
+        for start in range(0, len(texts), self.batch_size):
+
+            batch = texts[start:start + self.batch_size]
+
+            contents = [
+                self.types.Content(
+                    parts=[
+                        self.types.Part.from_text(
+                            text=f"{prefix}{text}"
+                        )
+                    ]
+                )
+                for text in batch
+            ]
+
+            result = self.client.models.embed_content(
+                model=self.model_name,
+                contents=contents,
+                config=self.types.EmbedContentConfig(
+                    output_dimensionality=self.output_dimensionality
+                ),
+            )
+
+            all_embeddings.extend(
+                embedding.values
+                for embedding in result.embeddings
+            )
+
+        embeddings = np.asarray(
+            all_embeddings,
+            dtype=np.float32,
         )
 
-        embeddings = self.model.encode(
-            texts,
-            show_progress_bar=True
-        )
+        if len(embeddings) != len(texts):
+            raise ValueError(
+                f"Expected {len(texts)} embeddings, "
+                f"but received {len(embeddings)}."
+            )
 
-        print(
-            f"Generated embeddings with shape: "
-            f"{embeddings.shape}"
-        )
+        print(f"Generated embeddings: {embeddings.shape}")
 
         return embeddings
 
 
-
-# -----------------------------Vector Store
+# VECTOR STORE
 
 class VectorStore:
     """
-    Manages document embeddings in ChromaDB.
+    ChromaDB vector store.
     """
 
     def __init__(
         self,
+        persist_directory: str,
         collection_name: str = "portfolio_knowledge",
-        persist_directory: str = "../knowledge/vector_store"
     ):
-
-        self.collection_name = collection_name
         self.persist_directory = persist_directory
-
-        self.client = None
-        self.collection = None
-
-        self._initialize_store()
-
-    def _initialize_store(self):
-
-        os.makedirs(
-            self.persist_directory,
-            exist_ok=True
-        )
+        self.collection_name = collection_name
 
         self.client = chromadb.PersistentClient(
-            path=self.persist_directory
+            path=persist_directory
         )
 
-        self.collection = (
-            self.client.get_or_create_collection(
-                name=self.collection_name,
-                metadata={
-                    "description":
-                        "Portfolio knowledge embeddings for RAG",
-                    "hnsw:space": "cosine"
-                }
+        self.collection = self.client.get_or_create_collection(
+            name=collection_name,
+            metadata={
+                "hnsw:space": "cosine"
+            },
+        )
+
+    def reset_collection(self):
+        """Delete and recreate the current Chroma collection."""
+
+        try:
+            self.client.delete_collection(
+                name=self.collection_name
             )
+            print(f"Deleted old collection: {self.collection_name}")
+        except Exception:
+            pass
+
+        self.collection = self.client.create_collection(
+            name=self.collection_name,
+            metadata={
+                "hnsw:space": "cosine"
+            },
         )
 
-        print(
-            f"Vector store initialized. "
-            f"Collection: {self.collection_name}"
-        )
+        print(f"Created fresh collection: {self.collection_name}")
 
-        print(
-            f"Existing documents in collection: "
-            f"{self.collection.count()}"
-        )
+    def add_documents(self, documents, embeddings):
+        """
+        Add documents and their embeddings to ChromaDB.
+        """
 
-    def add_documents(
-        self,
-        documents: List[Any],
-        embeddings: np.ndarray
-    ):
-
-        if len(documents) != len(embeddings):
-
-            raise ValueError(
-                "Number of documents must match "
-                "number of embeddings"
-            )
+        if not documents:
+            return
 
         ids = []
+        texts = []
         metadatas = []
-        documents_text = []
-        embeddings_list = []
+        vectors = []
 
-        for i, (
-            doc,
-            embedding
-        ) in enumerate(
+        for index, (document, embedding) in enumerate(
             zip(documents, embeddings)
         ):
-
-            source = doc.metadata.get(
-                "source",
-                "unknown"
+            ids.append(
+                f"{document.metadata.get('source', 'unknown')}_{index}"
             )
 
-            doc_id = (
-                f"{source}_{i}"
-            ).replace("\\", "_").replace("/", "_")
+            texts.append(document.page_content)
 
-            ids.append(doc_id)
-
-            metadata = dict(
-                doc.metadata
+            metadatas.append(
+                document.metadata
             )
 
-            metadata["doc_index"] = i
-
-            metadata["content_length"] = (
-                len(doc.page_content)
-            )
-
-            metadatas.append(metadata)
-
-            documents_text.append(
-                doc.page_content
-            )
-
-            embeddings_list.append(
+            vectors.append(
                 embedding.tolist()
             )
 
         self.collection.upsert(
             ids=ids,
-            embeddings=embeddings_list,
+            documents=texts,
             metadatas=metadatas,
-            documents=documents_text
+            embeddings=vectors,
         )
 
         print(
-            f"Successfully added/updated "
-            f"{len(documents)} documents"
+            f"Added {len(documents)} documents "
+            f"to collection '{self.collection_name}'"
         )
 
-        print(
-            f"Total documents in collection: "
-            f"{self.collection.count()}"
+    def search(
+        self,
+        query_embedding,
+        top_k=5,
+    ):
+        """
+        Search the vector store using cosine similarity.
+        """
+
+        results = self.collection.query(
+            query_embeddings=[
+                query_embedding.tolist()
+            ],
+            n_results=top_k,
         )
 
+        return results
 
 
-# -----------------------------RAG Retriever
-
+# RAG RETRIEVER
 
 class RAGRetriever:
     """
-    Handles query-based retrieval
-    from the vector store.
+    Retrieves relevant portfolio knowledge from ChromaDB.
     """
 
     def __init__(
         self,
+        embedding_manager: EmbeddingManager,
         vector_store: VectorStore,
-        embedding_manager: EmbeddingManager
     ):
-
-        self.vector_store = vector_store
         self.embedding_manager = embedding_manager
+        self.vector_store = vector_store
 
     def retrieve(
         self,
         query: str,
-        top_k: int = 5,
-        score_threshold: float = 0.0
-    ) -> List[Dict[str, Any]]:
+        top_k=5,
+    ):
+        """
+        Convert the user query into an embedding
+        and retrieve the most relevant documents.
+        """
 
-        print(
-            f"Retrieving documents for query: "
-            f"'{query}'"
+        query_embedding = self.embedding_manager.generate_embeddings(
+            [query],
+            is_query=True,
+        )[0]
+
+        results = self.vector_store.search(
+            query_embedding,
+            top_k=top_k,
         )
 
-        query_embedding = (
-            self.embedding_manager
-            .generate_embeddings([query])[0]
-        )
+        documents = results.get("documents", [[]])[0]
+        distances = results.get("distances", [[]])[0]
+        metadatas = results.get("metadatas", [[]])[0]
 
-        results = (
-            self.vector_store.collection.query(
-                query_embeddings=[
-                    query_embedding.tolist()
-                ],
-                n_results=top_k
-            )
-        )
+        retrieved_documents = []
 
-        retrieved_docs = []
-
-        if (
-            results["documents"]
-            and results["documents"][0]
+        for document, distance, metadata in zip(
+            documents,
+            distances,
+            metadatas,
         ):
+            retrieved_documents.append(
+                {
+                    "content": document,
+                    "distance": distance,
+                    "metadata": metadata,
+                }
+            )
 
-            documents = results["documents"][0]
-            metadatas = results["metadatas"][0]
-            distances = results["distances"][0]
-            ids = results["ids"][0]
-
-            for i, (
-                doc_id,
-                document,
-                metadata,
-                distance
-            ) in enumerate(
-                zip(
-                    ids,
-                    documents,
-                    metadatas,
-                    distances
-                )
-            ):
-
-                similarity_score = 1 - distance
-
-                if (
-                    similarity_score
-                    >= score_threshold
-                ):
-
-                    retrieved_docs.append({
-                        "id": doc_id,
-                        "content": document,
-                        "metadata": metadata,
-                        "similarity_score":
-                            similarity_score,
-                        "distance": distance,
-                        "rank": i + 1
-                    })
-
-        print(
-            f"Retrieved "
-            f"{len(retrieved_docs)} "
-            f"documents"
-        )
-
-        return retrieved_docs
+        return retrieved_documents
 
 
-
-# -----------------------RAG Configuration
-
+# PATHS
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
-KNOWLEDGE_DIR = (
-    BASE_DIR / "knowledge"
-)
+KNOWLEDGE_DIR = BASE_DIR / "knowledge"
 
-VECTOR_STORE_DIR = (
-    KNOWLEDGE_DIR / "vector_store"
-)
+VECTOR_STORE_DIR = KNOWLEDGE_DIR / "vector_store"
 
 
-# --------------------------RAG Components
+# LAZY RAG INITIALIZATION
 
 embedding_manager = None
 vectorstore = None
@@ -438,109 +294,155 @@ llm = None
 
 
 def initialize_rag():
+    """
+    Initialize RAG components only when needed.
+
+    This keeps API startup lightweight.
+    """
 
     global embedding_manager
     global vectorstore
     global rag_retriever
     global llm
 
-    # Prevent duplicate initialization
-    if embedding_manager is not None:
+    if (
+        embedding_manager is not None
+        and vectorstore is not None
+        and rag_retriever is not None
+        and llm is not None
+    ):
         return
 
-    print(
-        "Loading RAG components...",
-        flush=True
-    )
+    print("Initializing RAG...")
 
-    # Load embedding model
+    # Gemini Embedding 2
     embedding_manager = EmbeddingManager()
 
-    # Initialize ChromaDB
+    # ChromaDB
     vectorstore = VectorStore(
-        persist_directory=str(
-            VECTOR_STORE_DIR
-        )
+        persist_directory=str(VECTOR_STORE_DIR)
     )
 
-    # Create retriever
+    # Retriever
     rag_retriever = RAGRetriever(
-        vectorstore,
-        embedding_manager
+        embedding_manager=embedding_manager,
+        vector_store=vectorstore,
     )
 
-    # Initialize Gemini
+    # Gemini LLM
     llm = ChatGoogleGenerativeAI(
-        api_key=API_KEY,
         model="gemini-3.6-flash",
-        max_tokens=1024
+        google_api_key=API_KEY,
+        temperature=0.2,
     )
 
-    print(
-        "RAG components loaded successfully.",
-        flush=True
-    )
+    print("RAG initialized successfully.")
 
 
-
-# -----------------RAG Function
+# RAG FUNCTION
 
 def rag_simple(
-    query: str,
-    top_k: int = 5
+    question: str,
+    top_k=5,
 ):
+    """
+    Simple RAG pipeline:
 
-    # Initialize RAG only when needed
+    Question
+        ↓
+    Gemini Embedding
+        ↓
+    ChromaDB Retrieval
+        ↓
+    Context
+        ↓
+    Gemini LLM
+        ↓
+    Answer
+    """
+
     initialize_rag()
 
     # Retrieve relevant documents
-    results = rag_retriever.retrieve(
-        query,
-        top_k=top_k
+
+    retrieved_documents = rag_retriever.retrieve(
+        question,
+        top_k=top_k,
     )
 
-    # Build context
-    context = (
-        "\n\n".join(
-            [
-                doc["content"]
-                for doc in results
-            ]
+    if not retrieved_documents:
+        return (
+            "I don't have enough information in my portfolio "
+            "knowledge base to answer that."
         )
-        if results
-        else "No relevant documents found."
+
+    # Build context
+
+    context_parts = []
+
+    for item in retrieved_documents:
+        context_parts.append(
+            item["content"]
+        )
+
+    context = "\n\n---\n\n".join(
+        context_parts
     )
 
     # Prompt
+
     prompt = f"""
+You are an HR-style assistant for Abhishek Yadav's portfolio.
+
+Answer the user's question using ONLY the information provided
+in the context below.
+
+Rules:
+- Do not invent or assume information.
+- Do not add skills, projects, experience, education, or achievements
+  that are not present in the context.
+- If the answer is not available in the context, clearly say that
+  the information is not available.
+- Keep the answer concise and professional.
+- Answer in third person.
+- Do not mention RAG, embeddings, vector databases, ChromaDB,
+  prompts, or internal system details.
+- Do not provide personal contact information unless the user
+  specifically asks for it.
+
 Context:
 {context}
 
-Question:
-{query}
+User Question:
+{question}
 
 Answer:
 """
+    # Generate answer
 
-    # Gemini response
-    response = llm.invoke(
-        prompt
-    )
+    response = llm.invoke(prompt)
 
-    # Normalize response
-    if isinstance(
-        response.content,
-        str
-    ):
+    answer = response.content
 
-        answer = response.content
+    # Convert Gemini structured response to plain text
+    if isinstance(answer, str):
+        return answer
 
-    else:
+    if isinstance(answer, list):
+        text_parts = []
 
-        answer = "\n".join(
-            block["text"]
-            for block in response.content
-            if block.get("type") == "text"
-        )
+        for item in answer:
+            if isinstance(item, dict):
+                text = item.get("text")
+                if text:
+                    text_parts.append(text)
 
-    return answer
+            elif hasattr(item, "text"):
+                text = item.text
+                if text:
+                    text_parts.append(text)
+
+        if text_parts:
+            return "\n".join(text_parts)
+
+    return str(answer)

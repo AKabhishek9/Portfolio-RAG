@@ -45,6 +45,7 @@ def main():
         persist_directory=str(VECTOR_STORE_DIR)
     )
 
+    vector_store.reset_collection()
     vector_store.add_documents(
         chunks,
         embeddings
