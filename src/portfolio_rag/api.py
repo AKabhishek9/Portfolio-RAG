@@ -49,6 +49,8 @@ def root():
 @app.post("/chat")
 def chat(request: ChatRequest):
 
+    print("🔥 1. CHAT REQUEST RECEIVED", flush=True)
+
     question = request.question.strip()
 
     if not question:
@@ -56,8 +58,17 @@ def chat(request: ChatRequest):
             "answer": "Please enter a question."
         }
 
+    print("🔥 2. Importing RAG...", flush=True)
+
     from portfolio_rag.rag import rag_simple
+
+    print("🔥 3. RAG IMPORTED", flush=True)
+
+    print("🔥 4. Calling rag_simple...", flush=True)
+
     answer = rag_simple(question)
+
+    print("🔥 5. ANSWER GENERATED", flush=True)
 
     return {
         "answer": answer
