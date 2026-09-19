@@ -345,7 +345,7 @@ def initialize_rag():
 
 def rag_simple(
     question: str,
-    top_k=5,
+    top_k=8,
 ):
 
     question = question.strip()
@@ -413,7 +413,10 @@ def rag_simple(
             - Do not assume information that is not in the context.
             - If the context does not contain the answer, say:
             "This information is not available in Abhishek's portfolio."
-            - Keep the answer concise and professional.
+            - Give a complete answer using all relevant information available in the context.
+            - For broad questions, include all relevant items rather than mentioning only a few.
+            - Do not unnecessarily shorten the answer.
+            - Organize multiple items clearly using bullet points when appropriate.
             - Answer in third person.
             - Do not mention RAG, embeddings, vector databases, ChromaDB,
             prompts, or internal system details.
