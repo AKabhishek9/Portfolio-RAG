@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 app = FastAPI(
     title="Portfolio RAG",
-    version="1.0.0"
+    version="1.0.2"
 )
 
 
@@ -70,4 +70,4 @@ def chat(request: ChatRequest):
 
 @app.get("/health")
 def health():
-    return {"status": "healthy"}
+    return {"status": "Working"}

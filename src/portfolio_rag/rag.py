@@ -335,7 +335,7 @@ def initialize_rag():
     model=API_MODEL,
     google_api_key=API_KEY,
     temperature=0.2,
-    max_output_tokens=300,
+    max_output_tokens=800,
     )
 
     print("RAG initialized successfully.")

@@ -1,68 +1,114 @@
-# 🤖 Portfolio RAG: Intelligent Resume & Project Retrieval Engine
+#  Portfolio RAG
 
-[![Python Version](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://www.python.org/)
-[![LangChain](https://img.shields.io/badge/LangChain-1.4%2B-green.svg)](https://python.langchain.com/)
-[![ChromaDB](https://img.shields.io/badge/ChromaDB-1.5%2B-orange.svg)](https://www.trychroma.com/)
-[![Sentence-Transformers](https://img.shields.io/badge/Sentence--Transformers-all--MiniLM--L6--v2-yellow.svg)](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2)
-[![Package Manager](https://img.shields.io/badge/managed%20by-uv-purple.svg)](https://github.com/astral-sh/uv)
-[![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)](LICENSE)
+A simple RAG-based chatbot that can answer questions about **Abhishek Yadav's portfolio, skills, projects, education and experience**.
 
-A modular, entity-grounded **Retrieval-Augmented Generation (RAG)** pipeline that indexes and semantically retrieves factual data from **Abhishek Yadav's** professional credentials, full-stack projects, technical competencies, and academic background.
+The main idea is simple:
 
----
+> Store portfolio information → find the relevant information → give it to Gemini → generate an answer.
 
-## 📌 Overview
-
-Large Language Models frequently hallucinate or lack domain-specific, personal context. **Portfolio RAG** eliminates this by establishing an end-to-end semantic retrieval layer over a structured, verified markdown knowledge base extracted directly from Abhishek Yadav's professional resume.
-
-### 🌟 Key Highlights
-- **Explicit Entity Grounding**: Knowledge documents explicitly identify "Abhishek Yadav" across headers and paragraphs to prevent pronoun ambiguity after vector chunking.
-- **Structured Metadata & YAML Frontmatter**: Every source document includes standardized headers (`id`, `title`, `entity`, `category`, `tags`, `summary`) ready for dense + metadata-filtered hybrid retrieval.
-- **Dense Vector Embeddings**: Uses Hugging Face's `sentence-transformers/all-MiniLM-L6-v2` generating 384-dimensional dense semantic vectors.
-- **Persistent Vector Store**: Indexed with ChromaDB (`PersistentClient`), supporting dynamic upserts, metadata storage, and distance-to-similarity transformations.
-- **Configurable Similarity Thresholding**: Filters out low-confidence context chunks using cosine similarity scoring before passing to the downstream LLM.
-- **Pre-calibrated Query Benchmarks**: Documents include benchmark `Target RAG Retrieval Queries` to maximize semantic alignment during vector search.
+The backend is built with Python, LangChain, ChromaDB, Gemini Embedding 2, Gemini Flash and FastAPI. It is connected to the portfolio website through an API.
 
 ---
 
-## 🏗️ Architecture & Pipeline Flow
+##  What This Project Does
 
+This project works like a personal portfolio assistant.
+
+A user can ask questions like:
+
+- What skills does Abhishek have?
+- What projects has he built?
+- Tell me about QuizAI.
+- What is Abhishek's education?
+- What AI technologies does he know?
+
+The chatbot first searches the portfolio knowledge base and then uses the relevant information to generate an answer.
+
+This helps the chatbot answer from the actual portfolio data instead of making up random information.
+
+---
+
+##  How It Works (Architecture)
+
+```text
+                 Portfolio Website
+                        |
+                        | User asks a question
+                        v
+                  FastAPI Backend
+                        |
+                        v
+                Gemini Embedding 2
+                        |
+                        v
+                     ChromaDB
+                        |
+                  Relevant chunks
+                        |
+                        v
+                  Gemini Flash
+                        |
+                        v
+                   Final Answer
+                        |
+                        v
+                  Portfolio Chatbot
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Modular Knowledge Base                   │
-│  (Resume, Projects, Skills, Experience, Education, etc.)    │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│             LangChain Ingestion & Chunking                  │
-│       DirectoryLoader & RecursiveCharacterTextSplitter      │
-│            (Chunk Size: 800, Overlap: 150)                  │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│               Dense Embedding Generation                    │
-│     SentenceTransformer ("all-MiniLM-L6-v2" - 384 dim)      │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 Persistent Vector Database                  │
-│                   ChromaDB Collection                       │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      RAGRetriever                           │
-│       Cosine Similarity Ranking & Score Thresholding        │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│               LLM Context Injection & Generation            │
-│            (Groq, OpenAI, Google Gemini, Ollama)            │
-└─────────────────────────────────────────────────────────────┘
+
+---
+
+##  Main Features
+
+- Personal portfolio chatbot
+- RAG-based question answering
+- Markdown knowledge base
+- Automatic document chunking
+- Gemini Embedding 2 for embeddings
+- 768-dimensional embeddings
+- ChromaDB for vector storage
+- Gemini Flash for answer generation
+- FastAPI backend
+- CORS support for the portfolio website
+- Greeting responses without starting the full RAG system
+- Local development support
+- Render deployment support
+- `/health` endpoint for health checking and waking the backend
+- Knowledge base is rebuilt during deployment to avoid old/stale vectors
+
+---
+
+##  Knowledge Base
+
+The `knowledge/` folder contains the information used by the chatbot.
+
+It includes information about:
+
+- About Abhishek
+- Skills
+- Education
+- Experience
+- Projects
+- Achievements
+- Certifications
+- Online profiles
+
+Example:
+
+```text
+knowledge/
+├── about.md
+├── achievements.md
+├── certifications.md
+├── education.md
+├── experience.md
+├── profiles.md
+├── projects.md
+├── resume.md
+├── skills.md
+└── projects/
+    ├── arkface.md
+    ├── money-ledger.md
+    └── quizai.md
 ```
 
 ---
@@ -71,207 +117,353 @@ Large Language Models frequently hallucinate or lack domain-specific, personal c
 
 ```text
 Portfolio RAG/
-├── .env.example                 # Template for environment variables & API tokens
-├── .gitignore                   # Ignores .env, virtualenvs, cache, checkpoints
-├── .python-version              # Python version pin (3.13)
-├── pyproject.toml               # Project metadata and UV build specifications
-├── requirements.txt             # Pip dependency definitions
-├── uv.lock                      # Deterministic dependency lockfile
-├── README.md                    # Project documentation
 │
-├── Notebook/
-│   └── document.ipynb           # Interactive ingestion, embedding, and retrieval pipeline
+├── .env
+├── .env.example
+├── .gitignore
+├── .python-version
+├── pyproject.toml
+├── requirements.txt
+├── uv.lock
+├── README.md
 │
-├── knowledge/                   # Grounded, modular knowledge base
-│   ├── README.md                # Knowledge base index & RAG manifest
-│   ├── about.md                 # Profile, contact info, and executive summary
-│   ├── achievements.md          # Hackathons & competitive programming milestones
-│   ├── certifications.md        # Professional workshops & credentials (GFG, HCL GUVI, Azisly)
-│   ├── education.md             # B.Tech degree, CGPA, coursework
-│   ├── experience.md            # Work history, roles, and technical achievements
-│   ├── profiles.md              # Social links (GitHub @AKabhishek9, LinkedIn, LeetCode)
-│   ├── projects.md              # Overview and comparative project matrix
-│   ├── resume.md                # Complete monolithic resume transcript
-│   ├── skills.md                # Categorized technical competencies
+├── knowledge/
+│   ├── about.md
+│   ├── achievements.md
+│   ├── certifications.md
+│   ├── education.md
+│   ├── experience.md
+│   ├── profiles.md
+│   ├── projects.md
+│   ├── resume.md
+│   ├── skills.md
 │   ├── projects/
-│   │   ├── arkface.md           # ArkFace: Real-time face recognition desktop app
-│   │   ├── money-ledger.md      # Money Ledger: Offline-first finance PWA
-│   │   └── quizai.md            # QuizAI: Adaptive AI quiz platform
-│   └── vector_store/            # Persistent ChromaDB vector index and metadata
+│   │   ├── arkface.md
+│   │   ├── money-ledger.md
+│   │   └── quizai.md
+│   └── vector_store/
 │
 └── src/
     └── portfolio_rag/
-        └── __init__.py          # Core package entry point
+        ├── __init__.py
+        ├── api.py
+        ├── ingest.py
+        └── rag.py
 ```
 
 ---
 
-## ⚙️ Installation & Setup
+##  Technologies Used
 
-### Prerequisites
-- **Python 3.13+**
-- Recommended: [uv](https://github.com/astral-sh/uv) (fast Python package manager) or standard `pip`
+| Technology | Use |
+|---|---|
+| Python 3.13+ | Main programming language |
+| LangChain | RAG and LLM integration |
+| Gemini Embedding 2 | Creates document and query embeddings |
+| Gemini Flash | Generates final answers |
+| ChromaDB | Stores and searches embeddings |
+| FastAPI | Backend API |
+| uv | Python package management |
+| Render | Backend deployment |
 
-### 1. Clone the Repository
+---
+
+##  Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+API_KEY="your_gemini_api_key"
+API_MODEL="gemini-3.6-flash"
+```
+
+Never upload the real `.env` file to GitHub.
+
+---
+
+##  Installation
+
+### 1. Clone the repository
+
 ```bash
 git clone https://github.com/AKabhishek9/Portfolio-RAG.git
 cd Portfolio-RAG
 ```
 
-### 2. Set Up Virtual Environment
+### 2. Install dependencies
 
-**Using `uv` (Recommended):**
+Using `uv`:
+
 ```bash
-# Create virtual environment and sync dependencies
 uv sync
 ```
 
-**Using Standard `venv` & `pip`:**
+Or using pip:
+
 ```bash
-python -m venv .venv
-
-# On Windows (PowerShell):
-.venv\Scripts\Activate.ps1
-
-# On macOS/Linux:
-source .venv/bin/activate
-
-# Install dependencies:
 pip install -r requirements.txt
 ```
 
----
+### 3. Add your API key
 
-## 🔑 Environment Configuration
-
-Create your local `.env` file to configure optional API keys for Hugging Face (higher download limits) and your preferred LLM provider:
-
-```bash
-# Copy the example file to .env
-cp .env.example .env
-```
-
-Edit `.env` with your preferred credentials:
+Create `.env`:
 
 ```env
-#API_KEY=your_groq_api_key_here
-
-```
-
-> **Note:** `.env` is listed in `.gitignore` to prevent confidential keys from being pushed to GitHub.
-
----
-
-## 🚀 Usage Guide
-
-The complete RAG ingestion and retrieval workflow is implemented in [`Notebook/document.ipynb`](file:///Notebook/document.ipynb).
-
-### 1. Ingestion & Text Splitting
-Loads all markdown documents from `knowledge/` and chunks them into overlapping windows:
-```python
-from langchain_community.document_loaders import DirectoryLoader, TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-loader = DirectoryLoader("../knowledge", glob="**/*.md", loader_cls=TextLoader)
-documents = loader.load()
-
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)
-chunks = text_splitter.split_documents(documents)
-```
-
-### 2. Generating Embeddings & Storing in ChromaDB
-```python
-from sentence_transformers import SentenceTransformer
-import chromadb
-
-# Initialize embedding model (384 dimensions)
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-
-# Initialize persistent ChromaDB
-client = chromadb.PersistentClient(path="../knowledge/vector_store")
-collection = client.get_or_create_collection(name="portfolio_knowledge")
-```
-
-### 3. Querying with `RAGRetriever`
-Query the vector store with custom `top_k` and similarity threshold filtering:
-```python
-# Query semantic retrieval
-results = rag_retriever.retrieve(
-    query="what are the skills abhishek have",
-    top_k=5,
-    score_threshold=0.0
-)
-
-for doc in results:
-    print(f"Rank {doc['rank']} | Score: {doc['similarity_score']:.4f}")
-    print(f"Source: {doc['metadata']['source']}")
-    print(doc['content'])
-    print("-" * 50)
+API_KEY="your_gemini_api_key"
+API_MODEL="gemini-3.6-flash"
 ```
 
 ---
 
-## 🧠 Knowledge Base Coverage
+##  Build the Knowledge Base
 
-| Category | Source File | Description |
-| :--- | :--- | :--- |
-| **Profile** | `knowledge/about.md` | Executive summary, core objectives, and contact details |
-| **Skills** | `knowledge/skills.md` | Full-stack, ML/AI, languages, databases, DevOps tools |
-| **Education** | `knowledge/education.md` | B.Tech in CSE, academic achievements, core CS coursework |
-| **Experience** | `knowledge/experience.md` | Hands-on project work, engineering roles, and contributions |
-| **Projects** | `knowledge/projects/*.md` | Deep dives into *Money Ledger*, *ArkFace*, and *QuizAI* |
-| **Achievements** | `knowledge/achievements.md` | HackerRank Orchestrate (Rank 766/1,983), LeetCode solving |
-| **Certificates** | `knowledge/certifications.md` | GeeksforGeeks, HCL GUVI AI Impact, Azisly AI simulation |
-| **Profiles** | `knowledge/profiles.md` | GitHub, LinkedIn, LeetCode, and web portfolio handles |
+The ingestion script loads the Markdown files from `knowledge/`, splits them into chunks and creates embeddings.
 
----
+Current chunk settings:
 
-## 🔌 Connecting Downstream LLMs (Next Step)
+```text
+Chunk size    : 800
+Chunk overlap : 150
+```
 
-To generate human-like answers using retrieved context, you can connect an LLM (e.g., via Groq or LangChain):
+Run:
 
-```python
-from langchain_core.prompts import ChatPromptTemplate
-# Example with Groq (Fast & Free-tier friendly)
-# from langchain_groq import ChatGroq
+```bash
+PYTHONPATH=src python -m portfolio_rag.ingest
+```
 
-PROMPT_TEMPLATE = """
-Answer the question based ONLY on the following verified context about Abhishek Yadav:
+The script:
 
-{context}
+1. Loads the Markdown files.
+2. Splits them into chunks.
+3. Creates Gemini embeddings.
+4. Resets the old ChromaDB collection.
+5. Adds the new documents and embeddings.
+
+Resetting the collection helps prevent old information from staying in the vector database after knowledge files are changed.
 
 ---
-Question: {question}
-Answer in a professional and concise manner:
-"""
 
-# Format retrieved documents as unified context
-context_text = "\n\n".join([doc["content"] for doc in results])
-prompt = PROMPT_TEMPLATE.format(context=context_text, question="What are Abhishek's key projects?")
+##  Running the API Locally
+
+Start FastAPI with:
+
+```bash
+PYTHONPATH=src uvicorn portfolio_rag.api:app --reload
+```
+
+The API normally runs at:
+
+```text
+http://127.0.0.1:8000
+```
+
+Open the API documentation at:
+
+```text
+http://127.0.0.1:8000/docs
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## 🔌 API Endpoints
 
-- **Language:** Python 3.13
-- **RAG Framework:** LangChain (`langchain`, `langchain-community`, `langchain-core`)
-- **Vector Database:** [ChromaDB](https://www.trychroma.com/)
-- **Embedding Model:** [Sentence-Transformers](https://sbert.net/) (`all-MiniLM-L6-v2`)
-- **Document Parsers:** `pypdf`, `pymupdf`
-- **Dependency Management:** [uv](https://github.com/astral-sh/uv) & standard `pip`
+### Home
+
+```text
+GET /
+```
+
+Returns the API status.
+
+### Health Check
+
+```text
+GET /health
+```
+
+Response:
+
+```json
+{
+  "status": "healthy"
+}
+```
+
+The portfolio calls this endpoint when the website opens. This gives the Render backend a chance to wake up before the user starts using the chatbot.
+
+### Chat
+
+```text
+POST /chat
+```
+
+Request:
+
+```json
+{
+  "question": "What skills does Abhishek have?"
+}
+```
+
+Response:
+
+```json
+{
+  "answer": "..."
+}
+```
 
 ---
 
-## 👤 Author & Contact
+##  Portfolio Connection
+
+The chatbot frontend sends questions to the deployed FastAPI backend.
+
+Portfolio:
+
+```text
+https://myportfolio-2dc17.web.app/
+```
+
+RAG API:
+
+```text
+https://portfolio-rag-rayf.onrender.com
+```
+
+When the portfolio opens, it sends a request to:
+
+```text
+https://portfolio-rag-rayf.onrender.com/health
+```
+
+This helps start the Render service before the user sends a chatbot question.
+
+The portfolio itself does not wait for this request, so the website can continue loading normally.
+
+---
+
+##  Render Deployment
+
+The backend is deployed on Render.
+
+### Build Command
+
+```bash
+pip install -r requirements.txt && PYTHONPATH=src python -m portfolio_rag.ingest
+```
+
+### Start Command
+
+```bash
+PYTHONPATH=src uvicorn portfolio_rag.api:app --host 0.0.0.0 --port $PORT
+```
+
+Render environment variables:
+
+```env
+API_KEY=your_gemini_api_key
+API_MODEL=gemini-3.6-flash
+```
+
+The Render Free service can sleep when there is no traffic. Because of this, the portfolio sends a `/health` request when someone opens the website.
+
+The first request after the service has been sleeping can still take some time because the server needs to start.
+
+---
+
+##  RAG Process
+
+The main RAG process is:
+
+```text
+1. User asks a question
+        ↓
+2. Question is converted into an embedding
+        ↓
+3. ChromaDB searches for similar knowledge
+        ↓
+4. Relevant documents are retrieved
+        ↓
+5. Retrieved content is added to the prompt
+        ↓
+6. Gemini Flash generates the answer
+        ↓
+7. Answer is returned to the portfolio
+```
+
+The chatbot is instructed to use only the retrieved portfolio information.
+
+---
+
+##  Keeping Answers Grounded
+
+The prompt tells Gemini to:
+
+- Use only the provided portfolio context.
+- Not invent skills or projects.
+- Not assume missing information.
+- Answer in third person.
+- Keep answers concise and professional.
+- Not expose internal RAG details.
+
+This makes the chatbot more suitable for an HR-style portfolio assistant.
+
+---
+
+##  Example Questions
+
+```text
+What skills does Abhishek have?
+
+What projects has Abhishek built?
+
+Tell me about QuizAI.
+
+Tell me about Money Ledger.
+
+What is Abhishek's education?
+
+What AI technologies does he know?
+
+What certifications does he have?
+```
+
+---
+
+##  Current Embedding Setup
+
+```text
+Embedding Model : gemini-embedding-2
+Dimensions      : 768
+Vector Database : ChromaDB
+Distance        : Cosine
+```
+
+The old Sentence Transformers embedding setup is no longer used.
+
+---
+
+##  Author
 
 **Abhishek Yadav**
-- **GitHub**: [@AKabhishek9](https://github.com/AKabhishek9)
-- **Email**: [abhishek101242144@gmail.com](mailto:abhishek101242144@gmail.com)
-- **Location**: Greater Noida, Uttar Pradesh, India
+
+- GitHub: https://github.com/AKabhishek9
+- Portfolio: https://myportfolio-2dc17.web.app/
 
 ---
 
-## 📄 License
+##  License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
+
+---
+
+##  Final Note
+
+I built this project to understand how RAG works in a real project.
+
+I started with a local RAG system and then connected it with a FastAPI backend and my portfolio website.
+
+The main goal is to make my portfolio interactive so an HR or recruiter can directly ask questions about my skills, projects, education and experience.
