@@ -13,3 +13,6 @@ python-dotenv
 beautifulsoup4
 lxml
 tqdm
+
+langchain_openai
+langgraph
